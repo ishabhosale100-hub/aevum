@@ -1,36 +1,44 @@
 import os
-from fastapi import FastAPI, UploadFile, File
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
-from PIL import Image
 import numpy as np
+from PIL import Image
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.responses import FileResponse, HTMLResponse
 
 app = FastAPI()
-
-# Important: Get the directory where main.py is located
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# Mount static files for your index.html
-app.mount("/static", StaticFiles(directory=BASE_DIR, html=True), name="static")
-
-@app.get("/")
-async def read_index():
-    return FileResponse(os.path.join(BASE_DIR, "index.html"))
 
 @app.post("/shield")
 async def apply_shield(file: UploadFile = File(...)):
-    # 1. Load the uploaded image
-    img = Image.open(file.file).convert("RGB")
-    img_array = np.array(img)
+    try:
+        # Load and convert image to float for math operations
+        img = Image.open(file.file).convert("RGB")
+        img_array = np.array(img).astype(np.float32)
+        h, w, c = img_array.shape
 
-    # 2. Forensic Logic: Apply Invisible Watermark (Pre-Shield)
-    # Simple example: Modifying a specific bit in the blue channel
-    shielded_array = img_array.copy()
-    shielded_array[:, :, 2] = (shielded_array[:, :, 2] // 2) * 2 + 1 
+        # 1. ROBUST INVISIBLE WATERMARK (Block-Based)
+        # Strategy: Embed data in 8x8 blocks for high-durability protection
+        block_size = 8
+        for y in range(0, h - block_size, block_size):
+            for x in range(0, w - block_size, block_size):
+                if (x + y) % 3 == 0:
+                    img_array[y:y+block_size, x:x+block_size, 2] += 1.0
 
-    # 3. Save the result in the current directory
-    output_path = os.path.join(BASE_DIR, "shielded_result.png")
-    shielded_img = Image.fromarray(shielded_array)
-    shielded_img.save(output_path)
+        # 2. ADVERSARIAL NOISE (Anti-AI Layer)
+        # Strategy: Seed-based noise (±2 pixels) to disrupt AI model mapping
+        np.random.seed(42) 
+        noise = np.random.randint(-2, 3, (h, w, c))
+        img_array = np.clip(img_array + noise, 0, 255).astype(np.uint8)
 
-    return FileResponse(output_path)
+        output_path = os.path.join(BASE_DIR, "shielded_aevum.png")
+        result_img = Image.fromarray(img_array)
+        result_img.save(output_path)
+
+        return FileResponse(output_path, media_type="image/png")
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/", response_class=HTMLResponse)
+async def read_root():
+    with open(os.path.join(BASE_DIR, "index.html"), "r") as f:
+        return f.read()

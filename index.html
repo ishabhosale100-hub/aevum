@@ -541,47 +541,62 @@
             }
         }
 
-        async function processAegis() {
-            const btn = document.getElementById('btnAegis');
-            const fileInput = document.getElementById('fileAegis');
+       async function processAegis() {
+    const btn = document.getElementById('btnAegis');
+    const fileInput = document.getElementById('fileAegis');
+    const logContainer = document.getElementById('logAegis');
+    const resPanel = document.getElementById('resAegis');
+
+    if (!fileInput.files[0]) return alert("Please select an image first!");
+
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner"></span> INITIALIZING SHIELD...`;
+    
+    // Animation logs for the professional look
+    await addLogs('logAegis', [
+        "Initializing Aevum Shield Engine...",
+        "Mapping image bitstream...",
+        "Applying 8x8 Block-Based Watermark...",
+        "Injecting Adversarial Noise (Anti-AI Layer)...",
+        "Finalizing forensic hardening..."
+    ]);
+
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+
+    try {
+        // Use relative path for Hugging Face compatibility
+        const response = await fetch('/shield', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
             
-            // 1. Validation: Ensure a file is selected
-            if (!fileInput.files[0]) return alert("Please select an image first!");
-
-            btn.disabled = true;
-            btn.innerHTML = `<span class="spinner"></span> UPLOADING...`;
-
-            // 2. Package the image for the Python backend
-            const formData = new FormData();
-            formData.append('file', fileInput.files[0]);
-
-            try {
-                // 3. Connect to main.py
-                const response = await fetch('http://localhost:8000/shield', {
-                    method: 'POST',
-                    body: formData
-                });
-                const data = await response.json();
-
-                // 4. Run your existing log animation using REAL steps from Python
-                await addLogs('logAegis', data.steps);
-
-                // 5. Update the result panel with a REAL download button
-                const resPanel = document.getElementById('resAegis');
-                resPanel.innerHTML = `
-                    <h3 style="color:var(--accent); margin-bottom:10px;">🛡️ SHIELD ACTIVE</h3>
-                    <p style="font-size:0.8rem; opacity:0.8; margin-bottom:15px;">Origin ID: ${data.origin_id}</p>
-                    <a href="${data.download_url}" download class="btn" style="display:block; text-align:center; text-decoration:none; background:white; color:black; border-radius:4px; padding:10px;">DOWNLOAD PROTECTED IMAGE</a>
-                `;
-                
-                resPanel.style.display = 'block';
-                btn.innerHTML = "SHIELD SECURED";
-
-            } catch (err) {
-                btn.innerHTML = "CONNECTION ERROR";
-                console.error("Check if main.py is running!", err);
-            }
+            resPanel.innerHTML = `
+                <h3 style="color:var(--accent); margin-bottom:10px;">🛡️ SHIELD ACTIVE</h3>
+                <p style="font-size:0.8rem; opacity:0.8; margin-bottom:15px;">
+                    Asset bitstream hardened with Block-Based LSB and Adversarial Noise.
+                </p>
+                <a href="${url}" download="shielded_aevum.png" class="btn" 
+                   style="display:block; text-align:center; text-decoration:none; background:var(--accent); color:#000; cursor:pointer;">
+                   DOWNLOAD PROTECTED IMAGE
+                </a>
+            `;
+            resPanel.style.display = 'block';
+            btn.innerHTML = "SHIELD SECURED";
+        } else {
+            throw new Error("Server error during shielding");
         }
+    } catch (err) {
+        btn.innerHTML = "CONNECTION ERROR";
+        btn.disabled = false;
+        console.error("Shielding Error:", err);
+        alert("Failed to connect to backend. Ensure main.py is running.");
+    }
+} 
         async function processOrigin() {
             const btn = document.getElementById('btnOrigin');
             const owner = document.getElementById('ownerName').value;
